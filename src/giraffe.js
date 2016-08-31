@@ -12,7 +12,8 @@
 
   let Giraffe = function(canvasElem, config){
     "use strict";
-
+    // TODO: set canvas DPI by looking at devices DPI.
+    // http://stackoverflow.com/a/15666143
     config = $.extend({
       graphs: [],
       zones: []
@@ -33,7 +34,7 @@
         if(units === "%"){
           return (num / 100) * maximum;
         } else {
-            return num;
+            return parseInt(num);
         }
       },
       _regionForGraph: function(graphConf){
@@ -53,6 +54,13 @@
           yStart: "0"
         }
       },
+      _setFillColor: function(color){
+        if(color){
+          this.context.fillStyle = color;
+        } else {
+          this.context.fillStyle = "black";
+        }
+      },
       _getOptions: function() {
         if(typeof(this.config.optionsRetrievalFn) === "function"){
           return this.config.optionsRetrievalFn();
@@ -60,25 +68,57 @@
           return new Object();
         }
       },
-      draw: function(){
-        for(var i=0; i < this.config.graphs.length; i++){
-          let graphConf = this.config.graphs[i];
-          let zoneConf = this._regionForGraph(graphConf);
-          let rWidth = this._measurmentToPx(zoneConf.width, this.canvas.width);
-          let rHeight = this._measurmentToPx(zoneConf.height, this.canvas.height);
-          console.log(this.canvas.width + " " + this.canvas.height)
-          let config = this._getOptions();
+      _drawLine: function(x1, y1, x2, y2){
+        this.context.beginPath();
+        this.context.moveTo(x1, y1);
+        this.context.lineTo(x2, y2);
+        this.context.stroke();
+      },
+      drawGraph: function(){
+        var t = this;
+        for(var i=0; i < t.config.graphs.length; i++){
+        
+          let graphConf = t.config.graphs[i];
+          let config    = t._getOptions();
+          let zoneConf  = t._regionForGraph(graphConf);
+          let rWidth    = t._measurmentToPx(zoneConf.width, t.canvas.width);
+          let rHeight   = t._measurmentToPx(zoneConf.height, t.canvas.height);
+          let rXOff     = t._measurmentToPx(zoneConf.xStart, t.canvas.width);
+          let rYOff     = t._measurmentToPx(zoneConf.yStart, t.canvas.height);
 
           if(graphConf.title){
-            let textWidth = this.context.measureText(graphConf.title).width;
-            console.log(textWidth)
-            this.context.font = config.font || "12px Arial";
-            this.context.strokeText(graphConf.title, (rWidth / 2) - (textWidth / 2), rHeight * 0.075);
+            let textWidth = t.context.measureText(graphConf.title).width;
+            t.context.font = config.font || "32px Arial";
+            t._setFillColor(graphConf.titleColor);
+            t.context.fillText(graphConf.title, ((rWidth) / 2) + rXOff - (textWidth / 2), rHeight * 0.075 + rYOff);
+            t._setFillColor();
           }
+
+          let MARGIN = 50; // pixels
+          t._drawLine(MARGIN + rXOff, rHeight + rYOff - MARGIN, rWidth + rXOff, rHeight + rYOff - MARGIN); // y-axis
+          t._drawLine(MARGIN + rXOff, MARGIN + rYOff, MARGIN + rXOff, rHeight + rYOff - MARGIN); // x-axis
+
+          let PADDING = 0.1;
+          let STICKS  = 1 - PADDING;
+
+          let bXOff   = MARGIN + rXOff;
+          let bYOff   = MARGIN + rYOff;
+          let bWidth  = rWidth  - bXOff;
+          let bHeight = rHeight - bYOff;
+
+          let data = graphConf.dataRetrievalFn();
+
+          let maxY = data.y.reduce(function(max, cur){
+            let curMax = Math.max(...cur);
+            return (curMax > max ? curMax : max);
+          }, -Infinity);
+
+          let widthPerStick   = bWidth * STICKS  / data.length;
+          let paddingPerStick = bWidth * PADDING / data.length;
         }
       }
     }
-    giraffe.draw();
+    giraffe.drawGraph();
     return giraffe;
   };
 
