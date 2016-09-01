@@ -43,6 +43,7 @@
         if(graphConf.zone){
           for(var i=0; i < this.config.zones.length; i++){
             let zone = this.config.zones[i];
+            console.log(graphConf.zone)
             if(zone.name === graphConf.zone){
               return zone;
             }
@@ -106,9 +107,8 @@
       drawGraph: function(){//{{{
         var t = this;
         for(var i=0; i < t.config.graphs.length; i++){
-        
           let graphConf = t.config.graphs[i];
-          let config    = t._getOptions();
+          let options    = t._getOptions();
           let zoneConf  = t._regionForGraph(graphConf);
           let rWidth    = t._measurmentToPx(zoneConf.width, t.canvas.width);
           let rHeight   = t._measurmentToPx(zoneConf.height, t.canvas.height);
@@ -126,14 +126,13 @@
           t._drawLine(MARGIN + rXOff, rHeight + rYOff - MARGIN, rWidth + rXOff, rHeight + rYOff - MARGIN); // x-axis
           t._drawLine(MARGIN + rXOff, rYOff, MARGIN + rXOff, rHeight + rYOff - MARGIN); // y-axis
 
-          let PADDING = 0.1;
+          let PADDING = 0.1; // Percent
           let STICKS  = 1 - PADDING;
 
           let bXOff   = MARGIN + rXOff;
           let bYOff   = rYOff;
-          let bWidth  = rWidth  - bXOff;
+          let bWidth  = rWidth  - MARGIN;
           let bHeight = rHeight - MARGIN;
-
           let data = graphConf.dataRetrievalFn();
 
           let maxY = data.y.reduce(function(max, cur){
@@ -150,14 +149,16 @@
           let paddingPerStick = bWidth * PADDING / data.y.length;
           let pXOff = widthPerStick / 2; // Point X Offset, incremented with each new candlestick
           
-          for(var i=0; i < data.y.length; i++){
-            let dStick = data.y[i];
+          for(var j=0; j < data.y.length; j++){
+            let dStick = data.y[j];
             let tXOff = pXOff + bXOff; // Total X Offset
             let tYOff = bYOff; // Total Y Offset
             this._drawCandle(tXOff, tYOff, minY, maxY, bHeight, dStick, widthPerStick);
             pXOff += widthPerStick + paddingPerStick;
           }
+          console.log('meep')
         }
+        console.log("ehh")
       }
     }//}}}
     giraffe.drawGraph();
