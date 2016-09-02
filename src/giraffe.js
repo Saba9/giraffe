@@ -43,7 +43,6 @@
         if(graphConf.zone){
           for(var i=0; i < this.config.zones.length; i++){
             let zone = this.config.zones[i];
-            console.log(graphConf.zone)
             if(zone.name === graphConf.zone){
               return zone;
             }
@@ -77,6 +76,13 @@
         this.context.lineTo(x2, y2);
         this.context.stroke();
       },//}}}
+      _setStrokeColor: function(color){//{{{
+        if(color){
+          this.context.strokeStyle = color;
+        } else {
+          this.context.strokeStyle = "black"; // TODO: Use variables instead.
+        }
+      },//}}}
       _drawCandle: function(xOff, yOff, minY, maxY, rHeight, data, bodyWidth){//{{{
         let candleHighY   = (1 - (data[0] - minY) / (maxY - minY)) * rHeight;
         let candleLowY    = (1 - (data[1] - minY) / (maxY - minY)) * rHeight;
@@ -99,6 +105,32 @@
           let y = Math.round(evt.clientY - rect.top);
           me._writeMessage("(" + x + ", " + y + ")", 40, 40);
         });
+      },//}}}
+      _setFontSizeForWidth(text, maxWidth, min, max, fontFam){//{{{
+        let size = max;
+        // Lazy inefficient method.
+        do {
+          this.context.font = size + "px " + fontFam;
+          size -= 1;
+          console.log(size)
+          console.log(this.context.measureText(text).width)
+        } while(this.context.measureText(text).width > maxWidth && size > min);
+      },//}}}
+      _drawGridLines: function(xOff, yOff, minY, maxY, bWidth, bHeight, textWidth, n){//{{{
+        let diff = maxY - minY; 
+        let dYIncr = diff / n; // Reffering to increments in datas y val
+        let gYIncr = dYIncr / (maxY - minY) * bHeight;
+        let dYVal = minY;
+        this._setStrokeColor("#787878"); // TODO: Use var for this color...
+        this._setFontSizeForWidth("6.08", textWidth, 0, 100, "Arial");
+        console.log(n)
+        for(var i=0; i < n + 1; i++){
+          this._drawLine(xOff, yOff, xOff + bWidth + textWidth, yOff);
+          this.context.fillText("" + dYVal.toFixed(2), xOff + bWidth + textWidth - this.context.measureText("6.08").width, yOff - 5); 
+          yOff += gYIncr;
+          dYVal += dYIncr;
+        }
+        this._setStrokeColor();
       },//}}}
       _writeMessage: function(text, x, y){//{{{
         this.context.font = this._getOptions().font || "32px Arial";
@@ -123,16 +155,17 @@
           }
 
           let MARGIN = 50; // pixels
-          t._drawLine(MARGIN + rXOff, rHeight + rYOff - MARGIN, rWidth + rXOff, rHeight + rYOff - MARGIN); // x-axis
-          t._drawLine(MARGIN + rXOff, rYOff, MARGIN + rXOff, rHeight + rYOff - MARGIN); // y-axis
+          let TOP_MARG = 50
+          t._drawLine(rXOff, rHeight + rYOff - MARGIN, rWidth + rXOff, rHeight + rYOff - MARGIN); // x-axis
+          //t._drawLine(rXOff, rYOff, rXOff, rHeight + rYOff - MARGIN); // y-axis
 
           let PADDING = 0.1; // Percent
           let STICKS  = 1 - PADDING;
 
-          let bXOff   = MARGIN + rXOff;
-          let bYOff   = rYOff;
+          let bXOff   = rXOff;
+          let bYOff   = rYOff + TOP_MARG;
           let bWidth  = rWidth  - MARGIN;
-          let bHeight = rHeight - MARGIN;
+          let bHeight = rHeight - MARGIN - TOP_MARG;
           let data = graphConf.dataRetrievalFn();
 
           let maxY = data.y.reduce(function(max, cur){
@@ -144,6 +177,9 @@
             let curMin = Math.min(...cur);
             return (curMin < min ? curMin : min);
           }, Infinity);
+          
+          this._drawGridLines(bXOff, bYOff, minY, maxY, bWidth, bHeight, MARGIN, 10);
+          console.log(maxY + ", " + minY)
 
           let widthPerStick   = bWidth * STICKS  / data.y.length;
           let paddingPerStick = bWidth * PADDING / data.y.length;
@@ -156,9 +192,7 @@
             this._drawCandle(tXOff, tYOff, minY, maxY, bHeight, dStick, widthPerStick);
             pXOff += widthPerStick + paddingPerStick;
           }
-          console.log('meep')
         }
-        console.log("ehh")
       }
     }//}}}
     giraffe.drawGraph();
