@@ -120,17 +120,19 @@
         let diff = maxY - minY; 
         let dYIncr = diff / n; // Reffering to increments in datas y val
         let gYIncr = dYIncr / (maxY - minY) * bHeight;
-        let dYVal = minY;
+        let dYVal = maxY;
         this._setStrokeColor("#787878"); // TODO: Use var for this color...
+        this._setFillColor("#666");
         this._setFontSizeForWidth("6.08", textWidth, 0, 100, "Arial");
         console.log(n)
         for(var i=0; i < n + 1; i++){
           this._drawLine(xOff, yOff, xOff + bWidth + textWidth, yOff);
           this.context.fillText("" + dYVal.toFixed(2), xOff + bWidth + textWidth - this.context.measureText("6.08").width, yOff - 5); 
           yOff += gYIncr;
-          dYVal += dYIncr;
+          dYVal -= dYIncr; // increment is kinda misleading...
         }
         this._setStrokeColor();
+        this._setFillColor();
       },//}}}
       _writeMessage: function(text, x, y){//{{{
         this.context.font = this._getOptions().font || "32px Arial";
