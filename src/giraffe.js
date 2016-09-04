@@ -10,7 +10,7 @@
   $(document).ready(function(){
     window.Giraffe = [];
   });
-  let CanvasRegion = function(context, xOff, yOff, width, height){
+  let CanvasRegion = function(context, xOff, yOff, width, height){ //{{{
     return {
       context: context,
       xOff: xOff,
@@ -32,7 +32,7 @@
         this.context.translate(-xOff, -yOff);
       }
     }
-  }
+  } //}}}
 
   let Giraffe = function(canvasElem, config){
     "use strict";
@@ -119,14 +119,21 @@
         this.context.fillRect(xOff - bodyWidth / 2, yOff + y1, bodyWidth, y2 - y1);
         this._setFillColor();
       },//}}}
-      _showMouseChords: function(){//{{{
-        let me = this;
-        me.canvas.addEventListener('mousemove', function(evt){
-          me.context.clearRect(0, 0, 200, 100)
-          var rect = me.canvas.getBoundingClientRect();
-          let x = Math.round(evt.clientX - rect.left);
-          let y = Math.round(evt.clientY - rect.top);
-          me._writeMessage("(" + x + ", " + y + ")", 40, 40);
+      _showMouseCoords: function(){//{{{
+        let t = this;
+        t.canvas.addEventListener('mousemove', function(evt){
+          let xRatio = t.canvas.width / $(t.canvas).width();
+          let yRatio = t.canvas.height / $(t.canvas).height();
+
+          var rect = t.canvas.getBoundingClientRect();
+          let x = Math.round(evt.clientX - rect.left) * xRatio;
+          let y = Math.round(evt.clientY - rect.top) * yRatio;
+
+          let msg = "(" + x + ", " + y + ")";
+          let tms = t.context.measureText(msg);
+          console.log(tms)
+          t.context.clearRect(0, 0, tms.width + 30, 50)
+          t._writeMessage(msg, 0, 40);
         });
       },//}}}
       _setFontSizeForWidth(text, maxWidth, min, max, fontFam){//{{{
@@ -162,6 +169,7 @@
       },//}}}
       drawGraph: function(){//{{{
         var t = this;
+        t._showMouseCoords()
         for(var i=0; i < t.config.graphs.length; i++){
           let graphConf = t.config.graphs[i];
           let options   = t._getOptions();
@@ -182,7 +190,7 @@
             }
 
             let dTopMargin    = 50; // pixels
-            let dBottomMargin = 0;
+            let dBottomMargin = 50;
             let dRightMargin  = 0;
             let dLeftMargin   = 0;
 
@@ -229,7 +237,6 @@
       }
     }//}}}
     giraffe.drawGraph();
-    // giraffe._showMouseChords();
     return giraffe;
   };
 
