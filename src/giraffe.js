@@ -10,6 +10,29 @@
   $(document).ready(function(){
     window.Giraffe = [];
   });
+  let CanvasRegion = function(context, xOff, yOff, width, height){
+    return {
+      context: context,
+      xOff: xOff,
+      yOff: yOff,
+      width: width,
+      height: height,
+      drawBounds: function(){
+        context.fillStyle = '#'+Math.random().toString(16).substr(-6);
+        context.globalAlpha = 0.5
+
+        context.fillRect(0, 0, this.width, this.height);
+
+        context.fillStyle = "black";
+        context.globalAlpha = 1.0
+      },
+      drawWithin: function(func){
+        this.context.translate(xOff, yOff);
+        func(this);
+        this.context.translate(-xOff, -yOff);
+      }
+    }
+  }
 
   let Giraffe = function(canvasElem, config){
     "use strict";
@@ -116,18 +139,17 @@
           console.log(this.context.measureText(text).width)
         } while(this.context.measureText(text).width > maxWidth && size > min);
       },//}}}
-      _drawGridLines: function(xOff, yOff, minY, maxY, bWidth, bHeight, textWidth, n){//{{{
+      _drawGridLines: function(xOff, yOff, minY, maxY, bWidth, bHeight, n){//{{{
         let diff = maxY - minY; 
         let dYIncr = diff / n; // Reffering to increments in datas y val
         let gYIncr = dYIncr / (maxY - minY) * bHeight;
         let dYVal = maxY;
         this._setStrokeColor("#787878"); // TODO: Use var for this color...
         this._setFillColor("#666");
-        this._setFontSizeForWidth("6.08", textWidth, 0, 100, "Arial");
         console.log(n)
         for(var i=0; i < n + 1; i++){
-          this._drawLine(xOff, yOff, xOff + bWidth + textWidth, yOff);
-          this.context.fillText("" + dYVal.toFixed(2), xOff + bWidth + textWidth - this.context.measureText("6.08").width, yOff - 5); 
+          this._drawLine(xOff, yOff, xOff + bWidth, yOff);
+          this.context.fillText("" + dYVal.toFixed(2), xOff + bWidth - this.context.measureText("6.08").width, yOff - 5); 
           yOff += gYIncr;
           dYVal -= dYIncr; // increment is kinda misleading...
         }
@@ -142,58 +164,67 @@
         var t = this;
         for(var i=0; i < t.config.graphs.length; i++){
           let graphConf = t.config.graphs[i];
-          let options    = t._getOptions();
+          let options   = t._getOptions();
           let zoneConf  = t._regionForGraph(graphConf);
           let rWidth    = t._measurmentToPx(zoneConf.width, t.canvas.width);
           let rHeight   = t._measurmentToPx(zoneConf.height, t.canvas.height);
           let rXOff     = t._measurmentToPx(zoneConf.xStart, t.canvas.width);
           let rYOff     = t._measurmentToPx(zoneConf.yStart, t.canvas.height);
-
-          if(graphConf.title){
-            let textWidth = t.context.measureText(graphConf.title).width;
-            t._setFillColor(graphConf.titleColor);
-            this._writeMessage(graphConf.title, ((rWidth) / 2) + rXOff - (textWidth / 2), rHeight * 0.075 + rYOff);
-            t._setFillColor();
-          }
-
-          let MARGIN = 50; // pixels
-          let TOP_MARG = 50
-          t._drawLine(rXOff, rHeight + rYOff - MARGIN, rWidth + rXOff, rHeight + rYOff - MARGIN); // x-axis
-          //t._drawLine(rXOff, rYOff, rXOff, rHeight + rYOff - MARGIN); // y-axis
-
-          let PADDING = 0.1; // Percent
-          let STICKS  = 1 - PADDING;
-
-          let bXOff   = rXOff;
-          let bYOff   = rYOff + TOP_MARG;
-          let bWidth  = rWidth  - MARGIN;
-          let bHeight = rHeight - MARGIN - TOP_MARG;
-          let data = graphConf.dataRetrievalFn();
-
-          let maxY = data.y.reduce(function(max, cur){
-            let curMax = Math.max(...cur);
-            return (curMax > max ? curMax : max);
-          }, -Infinity);
-
-          let minY = data.y.reduce(function(min, cur){
-            let curMin = Math.min(...cur);
-            return (curMin < min ? curMin : min);
-          }, Infinity);
           
-          this._drawGridLines(bXOff, bYOff, minY, maxY, bWidth, bHeight, MARGIN, 10);
-          console.log(maxY + ", " + minY)
+          new CanvasRegion(t.context, rXOff, rYOff, rWidth, rHeight).drawWithin(function(gr){
+            gr.drawBounds();
+            console.log("hello")
+            if(graphConf.title){
+              let textWidth = t.context.measureText(graphConf.title).width;
+              t._setFillColor(graphConf.titleColor);
+              t._writeMessage(graphConf.title, ((gr.width) / 2) - (textWidth / 2), gr.height * 0.075);
+              t._setFillColor();
+            }
 
-          let widthPerStick   = bWidth * STICKS  / data.y.length;
-          let paddingPerStick = bWidth * PADDING / data.y.length;
-          let pXOff = widthPerStick / 2; // Point X Offset, incremented with each new candlestick
-          
-          for(var j=0; j < data.y.length; j++){
-            let dStick = data.y[j];
-            let tXOff = pXOff + bXOff; // Total X Offset
-            let tYOff = bYOff; // Total Y Offset
-            this._drawCandle(tXOff, tYOff, minY, maxY, bHeight, dStick, widthPerStick);
-            pXOff += widthPerStick + paddingPerStick;
-          }
+            let dTopMargin    = 50; // pixels
+            let dBottomMargin = 0;
+            let dRightMargin  = 0;
+            let dLeftMargin   = 0;
+
+            let dr = new CanvasRegion(gr.context, dLeftMargin, dTopMargin, gr.width - dRightMargin - dLeftMargin, gr.height - dBottomMargin - dTopMargin)
+            dr.drawWithin(function(drawingRegion){
+
+              t._drawLine(0, dr.height, dr.width, dr.height); // x-axis
+
+              let data = graphConf.dataRetrievalFn();
+
+              let maxY = data.y.reduce(function(max, cur){
+                let curMax = Math.max(...cur);
+                return (curMax > max ? curMax : max);
+              }, -Infinity);
+
+              let minY = data.y.reduce(function(min, cur){
+                let curMin = Math.min(...cur);
+                return (curMin < min ? curMin : min);
+              }, Infinity);
+              
+              let maxTextWidth = dr.context.measureText(maxY.toFixed(2)).width;
+              t._drawGridLines(0, 0, minY, maxY, dr.width, dr.height, 10);
+
+              let PADDING = 0.1; // Percent
+              let STICKS  = 1 - PADDING;
+
+              var widthPerStick   = dr.width * STICKS  / data.y.length;
+              var paddingPerStick = dr.width * PADDING / data.y.length;
+
+              new CanvasRegion(dr.context, widthPerStick / 2, 0, dr.width - maxTextWidth, dr.height).drawWithin(function(dataRegion){
+                widthPerStick   = dataRegion.width * STICKS  / data.y.length;
+                paddingPerStick = dataRegion.width * PADDING / data.y.length;
+
+                let xOff = 0; // Point X Offset, incremented with each new candlestick
+                for(var j=0; j < data.y.length; j++){
+                  let dStick = data.y[j];
+                  t._drawCandle(xOff, 0, minY, maxY, dataRegion.height, dStick, widthPerStick);
+                  xOff += widthPerStick + paddingPerStick;
+                }
+              });
+            });
+          });
         }
       }
     }//}}}
