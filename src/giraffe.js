@@ -13,6 +13,7 @@
   let CanvasRegion = function(context, xOff, yOff, width, height){ //{{{
     return {
       context: context,
+      // All in pixels
       xOff: xOff,
       yOff: yOff,
       width: width,
@@ -41,13 +42,18 @@
     // http://stackoverflow.com/a/15666143
     config = $.extend({
       graphs: [],
-      zones: []
+      regions: []
     }, config);
 
     let giraffe = {
       canvas: canvasElem,
       context: canvasElem.getContext('2d'), 
       config: config,
+      cache: {
+        canvasRegionForGraph: []
+      },
+      _xRatio: canvasElem.width / $(canvasElem).width(),
+      _yRatio: canvasElem.height / $(canvasElem).height(),
       _parseMeasurment: function(measurment){ //{{{
         let matches = /(\d*)\s*([a-zA-Z%]*)/.exec(measurment);
         return [matches[1], matches[2]]
@@ -63,11 +69,11 @@
         }
       },//}}}
       _regionForGraph: function(graphConf){ //#{{{
-        if(graphConf.zone){
-          for(var i=0; i < this.config.zones.length; i++){
-            let zone = this.config.zones[i];
-            if(zone.name === graphConf.zone){
-              return zone;
+        if(graphConf.regionName){
+          for(var i=0; i < this.config.regions.length; i++){
+            let region = this.config.regions[i];
+            if(region.name === graphConf.regionName){
+              return region;
             }
           }
         } 
@@ -119,31 +125,12 @@
         this.context.fillRect(xOff - bodyWidth / 2, yOff + y1, bodyWidth, y2 - y1);
         this._setFillColor();
       },//}}}
-      _showMouseCoords: function(){//{{{
-        let t = this;
-        t.canvas.addEventListener('mousemove', function(evt){
-          let xRatio = t.canvas.width / $(t.canvas).width();
-          let yRatio = t.canvas.height / $(t.canvas).height();
-
-          var rect = t.canvas.getBoundingClientRect();
-          let x = Math.round(evt.clientX - rect.left) * xRatio;
-          let y = Math.round(evt.clientY - rect.top) * yRatio;
-
-          let msg = "(" + x + ", " + y + ")";
-          let tms = t.context.measureText(msg);
-          console.log(tms)
-          t.context.clearRect(0, 0, tms.width + 30, 50)
-          t._writeMessage(msg, 0, 40);
-        });
-      },//}}}
       _setFontSizeForWidth(text, maxWidth, min, max, fontFam){//{{{
         let size = max;
-        // Lazy inefficient method.
+        // Lazy inefficient method. Binary search would better.
         do {
           this.context.font = size + "px " + fontFam;
           size -= 1;
-          console.log(size)
-          console.log(this.context.measureText(text).width)
         } while(this.context.measureText(text).width > maxWidth && size > min);
       },//}}}
       _drawGridLines: function(xOff, yOff, minY, maxY, bWidth, bHeight, n){//{{{
@@ -153,7 +140,6 @@
         let dYVal = maxY;
         this._setStrokeColor("#787878"); // TODO: Use var for this color...
         this._setFillColor("#666");
-        console.log(n)
         for(var i=0; i < n + 1; i++){
           this._drawLine(xOff, yOff, xOff + bWidth, yOff);
           this.context.fillText("" + dYVal.toFixed(2), xOff + bWidth - this.context.measureText("6.08").width, yOff - 5); 
@@ -163,25 +149,68 @@
         this._setStrokeColor();
         this._setFillColor();
       },//}}}
+      _getPointerCoords: function(evt){//{{{
+          let rect = this.canvas.getBoundingClientRect();
+          let x = Math.round(evt.clientX - rect.left) * this._xRatio;
+          let y = Math.round(evt.clientY - rect.top) * this._yRatio;
+          return {x: x, y: y};
+      },//}}}
+      _getRegionFromCoords: function(coords){
+        let x = coords.x, y = coords.y;
+        let canvasRegions = this.cache.canvasRegionForGraph;
+        for(var i=0; i < canvasRegions.length; i++){
+          let cr = canvasRegions[i]; 
+          let xMin = cr.xOff;
+          let xMax = cr.xOff + cr.width;
+          let yMin = cr.yOff;
+          let yMax = cr.yOff + cr.height;
+          if(x > xMin && y > yMin && x < xMax && y < yMax){
+            this._clearCanvas();
+            this.drawGraph();
+            cr.drawWithin(function(){
+              cr.drawBounds();
+            });
+          }
+        }
+      },
+      _clearCanvas: function(){ //{{{
+        this.context.clearRect(0,0, this.canvas.width, this.canvas.height);
+      },//}}}
+      _showMouseCoords: function(coords){//{{{
+        let t = this
+        let msg = "(" + coords.x + ", " + coords.y + ")";
+        let tms = t.context.measureText("(" + t.canvas.width + ", " + t.canvas.height + ")");
+        t.context.clearRect(0, 0, tms.width, 50)
+        t._writeMessage(msg, 0, 40);
+      },//}}}
+      _setMouseMoveListener: function(evt){//{{{
+        let t = this;
+        t.canvas.addEventListener('mousemove', function(evt){
+          let coords = t._getPointerCoords(evt);
+          t._showMouseCoords(coords);
+          t._getRegionFromCoords(coords);
+        });
+      },//}}}
       _writeMessage: function(text, x, y){//{{{
         this.context.font = this._getOptions().font || "32px Arial";
         this.context.fillText(text, x, y);
       },//}}}
       drawGraph: function(){//{{{
         var t = this;
-        t._showMouseCoords()
         for(var i=0; i < t.config.graphs.length; i++){
           let graphConf = t.config.graphs[i];
           let options   = t._getOptions();
-          let zoneConf  = t._regionForGraph(graphConf);
-          let rWidth    = t._measurmentToPx(zoneConf.width, t.canvas.width);
-          let rHeight   = t._measurmentToPx(zoneConf.height, t.canvas.height);
-          let rXOff     = t._measurmentToPx(zoneConf.xStart, t.canvas.width);
-          let rYOff     = t._measurmentToPx(zoneConf.yStart, t.canvas.height);
+          let regionConf  = t._regionForGraph(graphConf);
+          let rWidth    = t._measurmentToPx(regionConf.width, t.canvas.width);
+          let rHeight   = t._measurmentToPx(regionConf.height, t.canvas.height);
+          let rXOff     = t._measurmentToPx(regionConf.xStart, t.canvas.width);
+          let rYOff     = t._measurmentToPx(regionConf.yStart, t.canvas.height);
           
-          new CanvasRegion(t.context, rXOff, rYOff, rWidth, rHeight).drawWithin(function(gr){
-            gr.drawBounds();
-            console.log("hello")
+          let graphReg = new CanvasRegion(t.context, rXOff, rYOff, rWidth, rHeight);
+          if(!t.cache.canvasRegionForGraph[i]){ // sus...
+            t.cache.canvasRegionForGraph.push(graphReg);
+          }
+          graphReg.drawWithin(function(gr){
             if(graphConf.title){
               let textWidth = t.context.measureText(graphConf.title).width;
               t._setFillColor(graphConf.titleColor);
@@ -212,7 +241,7 @@
               }, Infinity);
               
               let maxTextWidth = dr.context.measureText(maxY.toFixed(2)).width;
-              t._drawGridLines(0, 0, minY, maxY, dr.width, dr.height, 10);
+              t._drawGridLines(0, 0, minY, maxY, dr.width, dr.height, 5);
 
               let PADDING = 0.1; // Percent
               let STICKS  = 1 - PADDING;
@@ -236,6 +265,7 @@
         }
       }
     }//}}}
+    giraffe._setMouseMoveListener();
     giraffe.drawGraph();
     return giraffe;
   };

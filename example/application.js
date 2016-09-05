@@ -5,7 +5,7 @@ $(document).ready(function(){
     graphs: [{
      title: "Other Text",
      titleColor: "blue",
-     zone: "r1",
+     regionName: "r1",
      type: "candlestick",
      dataRetrievalFn: function(params){
        return {
@@ -30,7 +30,7 @@ $(document).ready(function(){
     }, {
       title: "Moar Text",
       titleColor: "blue",
-      zone: "r2",
+      regionName: "r2",
       type: "candlestick",
       dataRetrievalFn: function(params){
         return {
@@ -55,7 +55,7 @@ $(document).ready(function(){
     }, {
       title: "Wow Text",
       titleColor: "blue",
-      zone: "r3",
+      regionName: "r3",
       type: "candlestick",
       dataRetrievalFn: function(params){
         return {
@@ -78,7 +78,7 @@ $(document).ready(function(){
         ]};
       }
     }],
-    zones: [{
+    regions: [{
       name: "r1",
       width: "50%",
       height: "50%",
