@@ -18,6 +18,9 @@
       yOff: yOff,
       width: width,
       height: height,
+      clear: function(){
+        context.clearRect(0, 0, width, height);
+      },
       drawBounds: function(){
         context.fillStyle = '#'+Math.random().toString(16).substr(-6);
         context.globalAlpha = 0.5
@@ -155,7 +158,7 @@
           let y = Math.round(evt.clientY - rect.top) * this._yRatio;
           return {x: x, y: y};
       },//}}}
-      _getRegionFromCoords: function(coords){
+      _getRegionFromCoords: function(coords){//{{{
         let x = coords.x, y = coords.y;
         let canvasRegions = this.cache.canvasRegionForGraph;
         for(var i=0; i < canvasRegions.length; i++){
@@ -165,14 +168,25 @@
           let yMin = cr.yOff;
           let yMax = cr.yOff + cr.height;
           if(x > xMin && y > yMin && x < xMax && y < yMax){
-            this._clearCanvas();
-            this.drawGraph();
-            cr.drawWithin(function(){
-              cr.drawBounds();
-            });
+            return {region: cr, index: i};
           }
         }
-      },
+      },//}}}
+      _drawCrossHairs: function(coords){ //{{{
+        let gr = this._getRegionFromCoords(coords);
+        let graphIndex = gr.index;
+        let cr = gr.region;
+        let t = this;
+        cr.drawWithin(function(){cr.clear();});
+        t._drawGraph(t.config.graphs[graphIndex]);
+        this.context.setLineDash([5]);
+        cr.drawWithin(function(){
+          console.log(cr);
+          t._drawLine(coords.x - cr.xOff, 0, coords.x - cr.xOff, cr.height); // vertical
+          t._drawLine(0, coords.y - cr.yOff, cr.width, coords.y - cr.yOff); // horiz
+        });
+        this.context.setLineDash([0]);
+      },//}}}
       _clearCanvas: function(){ //{{{
         this.context.clearRect(0,0, this.canvas.width, this.canvas.height);
       },//}}}
@@ -187,86 +201,88 @@
         let t = this;
         t.canvas.addEventListener('mousemove', function(evt){
           let coords = t._getPointerCoords(evt);
-          t._showMouseCoords(coords);
-          t._getRegionFromCoords(coords);
+          //t._showMouseCoords(coords);
+          t._drawCrossHairs(coords);
         });
       },//}}}
       _writeMessage: function(text, x, y){//{{{
         this.context.font = this._getOptions().font || "32px Arial";
         this.context.fillText(text, x, y);
       },//}}}
-      drawGraph: function(){//{{{
-        var t = this;
-        for(var i=0; i < t.config.graphs.length; i++){
-          let graphConf = t.config.graphs[i];
-          let options   = t._getOptions();
-          let regionConf  = t._regionForGraph(graphConf);
-          let rWidth    = t._measurmentToPx(regionConf.width, t.canvas.width);
-          let rHeight   = t._measurmentToPx(regionConf.height, t.canvas.height);
-          let rXOff     = t._measurmentToPx(regionConf.xStart, t.canvas.width);
-          let rYOff     = t._measurmentToPx(regionConf.yStart, t.canvas.height);
-          
-          let graphReg = new CanvasRegion(t.context, rXOff, rYOff, rWidth, rHeight);
-          if(!t.cache.canvasRegionForGraph[i]){ // sus...
-            t.cache.canvasRegionForGraph.push(graphReg);
+      _drawGraph: function(graphConf, i){//{{{
+        let t = this;
+        let options    = t._getOptions();
+        let regionConf = t._regionForGraph(graphConf);
+        let rWidth     = t._measurmentToPx(regionConf.width, t.canvas.width);
+        let rHeight    = t._measurmentToPx(regionConf.height, t.canvas.height);
+        let rXOff      = t._measurmentToPx(regionConf.xStart, t.canvas.width);
+        let rYOff      = t._measurmentToPx(regionConf.yStart, t.canvas.height);
+        
+        let graphReg = new CanvasRegion(t.context, rXOff, rYOff, rWidth, rHeight);
+        if((i === 0 || i) && !t.cache.canvasRegionForGraph[i]){ // sus...
+          t.cache.canvasRegionForGraph.push(graphReg);
+        }
+        graphReg.drawWithin(function(gr){
+          if(graphConf.title){
+            let textWidth = t.context.measureText(graphConf.title).width;
+            t._setFillColor(graphConf.titleColor);
+            t._writeMessage(graphConf.title, ((gr.width) / 2) - (textWidth / 2), gr.height * 0.075);
+            t._setFillColor();
           }
-          graphReg.drawWithin(function(gr){
-            if(graphConf.title){
-              let textWidth = t.context.measureText(graphConf.title).width;
-              t._setFillColor(graphConf.titleColor);
-              t._writeMessage(graphConf.title, ((gr.width) / 2) - (textWidth / 2), gr.height * 0.075);
-              t._setFillColor();
-            }
 
-            let dTopMargin    = 50; // pixels
-            let dBottomMargin = 50;
-            let dRightMargin  = 0;
-            let dLeftMargin   = 0;
+          let dTopMargin    = 50; // pixels
+          let dBottomMargin = 50;
+          let dRightMargin  = 0;
+          let dLeftMargin   = 0;
 
-            let dr = new CanvasRegion(gr.context, dLeftMargin, dTopMargin, gr.width - dRightMargin - dLeftMargin, gr.height - dBottomMargin - dTopMargin)
-            dr.drawWithin(function(drawingRegion){
+          let dr = new CanvasRegion(gr.context, dLeftMargin, dTopMargin, gr.width - dRightMargin - dLeftMargin, gr.height - dBottomMargin - dTopMargin)
+          dr.drawWithin(function(drawingRegion){
 
-              t._drawLine(0, dr.height, dr.width, dr.height); // x-axis
+            t._drawLine(0, dr.height, dr.width, dr.height); // x-axis
 
-              let data = graphConf.dataRetrievalFn();
+            let data = graphConf.dataRetrievalFn();
 
-              let maxY = data.y.reduce(function(max, cur){
-                let curMax = Math.max(...cur);
-                return (curMax > max ? curMax : max);
-              }, -Infinity);
+            let maxY = data.y.reduce(function(max, cur){
+              let curMax = Math.max(...cur);
+              return (curMax > max ? curMax : max);
+            }, -Infinity);
 
-              let minY = data.y.reduce(function(min, cur){
-                let curMin = Math.min(...cur);
-                return (curMin < min ? curMin : min);
-              }, Infinity);
-              
-              let maxTextWidth = dr.context.measureText(maxY.toFixed(2)).width;
-              t._drawGridLines(0, 0, minY, maxY, dr.width, dr.height, 5);
+            let minY = data.y.reduce(function(min, cur){
+              let curMin = Math.min(...cur);
+              return (curMin < min ? curMin : min);
+            }, Infinity);
+            
+            let maxTextWidth = dr.context.measureText(maxY.toFixed(2)).width;
+            t._drawGridLines(0, 0, minY, maxY, dr.width, dr.height, 5);
 
-              let PADDING = 0.1; // Percent
-              let STICKS  = 1 - PADDING;
+            let PADDING = 0.1; // Percent
+            let STICKS  = 1 - PADDING;
 
-              var widthPerStick   = dr.width * STICKS  / data.y.length;
-              var paddingPerStick = dr.width * PADDING / data.y.length;
+            var widthPerStick   = dr.width * STICKS  / data.y.length;
+            var paddingPerStick = dr.width * PADDING / data.y.length;
 
-              new CanvasRegion(dr.context, widthPerStick / 2, 0, dr.width - maxTextWidth, dr.height).drawWithin(function(dataRegion){
-                widthPerStick   = dataRegion.width * STICKS  / data.y.length;
-                paddingPerStick = dataRegion.width * PADDING / data.y.length;
+            new CanvasRegion(dr.context, widthPerStick / 2, 0, dr.width - maxTextWidth, dr.height).drawWithin(function(dataRegion){
+              widthPerStick   = dataRegion.width * STICKS  / data.y.length;
+              paddingPerStick = dataRegion.width * PADDING / data.y.length;
 
-                let xOff = 0; // Point X Offset, incremented with each new candlestick
-                for(var j=0; j < data.y.length; j++){
-                  let dStick = data.y[j];
-                  t._drawCandle(xOff, 0, minY, maxY, dataRegion.height, dStick, widthPerStick);
-                  xOff += widthPerStick + paddingPerStick;
-                }
-              });
+              let xOff = 0; // Point X Offset, incremented with each new candlestick
+              for(var j=0; j < data.y.length; j++){
+                let dStick = data.y[j];
+                t._drawCandle(xOff, 0, minY, maxY, dataRegion.height, dStick, widthPerStick);
+                xOff += widthPerStick + paddingPerStick;
+              }
             });
           });
+        });
+      },//}}}}
+      drawGraphs: function(){//{{{
+        for(var i=0; i < this.config.graphs.length; i++){
+          this._drawGraph(this.config.graphs[i], i);
         }
       }
     }//}}}
     giraffe._setMouseMoveListener();
-    giraffe.drawGraph();
+    giraffe.drawGraphs();
     return giraffe;
   };
 
