@@ -55,7 +55,7 @@ var canvasGraphs = new Giraffe({
       xStart: "0",
       yStart: "0",
       width: "100%",
-      height: "100%:
+      height: "100%
     }
   ]
 });
